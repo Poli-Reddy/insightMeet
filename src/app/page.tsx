@@ -7,45 +7,37 @@ import AnalysisDashboard from "@/components/analysis/analysis-dashboard";
 import type { AnalysisData, TranscriptEntry, ParticipationMetric, EmotionTimelinePoint, RelationshipGraphData } from "@/lib/types";
 import Logo from "@/components/logo";
 import PipelineBreakdown from "@/components/pipeline-breakdown";
-import { transcribeAudio } from "@/ai/flows/automated-transcription";
+import { diarizeAudio } from "@/ai/flows/speaker-diarization";
 import { useToast } from "@/hooks/use-toast";
 
 type AppState = "idle" | "loading" | "results";
 
-// Helper to generate dynamic mock data based on a real transcript
-const generateDynamicAnalysis = (transcriptText: string): AnalysisData => {
-  const sentences = transcriptText.split(/[.?!]/).filter(s => s.trim().length > 0);
-  const numSpeakers = Math.min(6, sentences.length);
-  const speakers = Array.from({ length: numSpeakers }, (_, i) => ({
-      id: String.fromCharCode(65 + i),
+// Helper to generate dynamic mock data based on a real diarized transcript
+const generateDynamicAnalysis = (diarizedResult: { speaker: number; text: string }[]): AnalysisData => {
+  const uniqueSpeakers = [...new Set(diarizedResult.map(u => u.speaker))];
+  const numSpeakers = uniqueSpeakers.length;
+
+  const speakers = uniqueSpeakers.map((speakerIndex, i) => ({
+      id: String.fromCharCode(65 + i), // Assign A, B, C...
+      speakerIndex: speakerIndex,
       label: `Speaker ${String.fromCharCode(65 + i)}`,
   }));
-  const speakerIds = speakers.map(s => s.id);
 
   let currentTime = 0;
-  let currentSpeakerIndex = 0;
-  let speakerTurnLength = 0;
-
-  const transcript: TranscriptEntry[] = sentences.map((sentence, index) => {
-    const duration = Math.floor(sentence.length / 15) + 1;
+  const transcript: TranscriptEntry[] = diarizedResult.map((utterance, index) => {
+    const duration = Math.floor(utterance.text.length / 15) + 1; // Rough estimate
     currentTime += duration;
-
-    // Simulate more realistic speaker turns
-    if (speakerTurnLength <= 0 || Math.random() < 0.3) {
-      currentSpeakerIndex = Math.floor(Math.random() * numSpeakers);
-      speakerTurnLength = Math.floor(Math.random() * 3) + 1; // Speak 1-3 sentences
-    }
-    speakerTurnLength--;
-    const speaker = speakers[currentSpeakerIndex];
+    
+    const speakerInfo = speakers.find(s => s.speakerIndex === utterance.speaker)!;
 
     return {
       id: index + 1,
-      speaker: speaker.id,
-      label: speaker.label,
-      text: sentence.trim() + ".",
+      speaker: speakerInfo.id,
+      label: speakerInfo.label,
+      text: utterance.text,
       sentiment: ['Positive', 'Negative', 'Neutral'][Math.floor(Math.random() * 3)] as 'Positive' | 'Negative' | 'Neutral',
-      emotion: ['curious', 'supportive', 'critical'][Math.floor(Math.random() * 3)],
-      timestamp: `00:${currentTime.toString().padStart(2, '0')}`,
+      emotion: ['curious', 'supportive', 'critical', 'neutral'][Math.floor(Math.random() * 4)],
+      timestamp: `00:${Math.min(currentTime, 14).toString().padStart(2, '0')}`, // Ensure timestamp doesn't exceed video length
     };
   });
 
@@ -64,15 +56,15 @@ const generateDynamicAnalysis = (transcriptText: string): AnalysisData => {
   const emotionTimeline: EmotionTimelinePoint[] = Array.from({length: 5}, (_, i) => {
       const time = Math.floor(i * (currentTime / 4));
       const point: EmotionTimelinePoint = { time: `0:${time.toString().padStart(2, '0')}` };
-      speakerIds.forEach(id => {
-          point[id] = Math.random() * 2 - 1;
+      speakers.forEach(s => {
+          point[s.id] = Math.random() * 2 - 1;
       });
       return point;
   });
 
   const relationshipGraph: RelationshipGraphData = {
     nodes: speakers.map((s, i) => ({ id: s.id, label: s.label, group: i + 1 })),
-    links: Array.from({length: numSpeakers}, (_, i) => ({
+    links: Array.from({length: Math.max(0, numSpeakers -1)}, (_, i) => ({
       source: speakers[i].id,
       target: speakers[(i + 1) % numSpeakers].id,
       type: ['support', 'conflict', 'neutral'][Math.floor(Math.random() * 3)] as 'support' | 'conflict' | 'neutral',
@@ -85,7 +77,7 @@ const generateDynamicAnalysis = (transcriptText: string): AnalysisData => {
       title: "Dynamic Analysis Report",
       overallSentiment: "Mixed",
       points: transcript.slice(0, 4).map(t => t.text),
-      relationshipSummary: "This is a dynamically generated relationship summary based on the transcribed text."
+      relationshipSummary: "This is a dynamically generated relationship summary based on the diarized transcript."
     },
     transcript,
     participation,
@@ -108,16 +100,15 @@ export default function Home() {
       reader.onload = async () => {
         const audioDataUri = reader.result as string;
         
-        // Call the transcription flow
-        const transcriptionResult = await transcribeAudio({ audioDataUri });
-        const transcriptText = transcriptionResult.transcript;
+        // Call the new diarization flow
+        const diarizationResult = await diarizeAudio({ audioDataUri });
 
-        if (!transcriptText || transcriptText.trim().length === 0) {
-          throw new Error("Transcription failed or returned empty.");
+        if (!diarizationResult || !diarizationResult.utterances || diarizationResult.utterances.length === 0) {
+          throw new Error("Diarization failed or returned no utterances.");
         }
 
-        // Generate the rest of the analysis dynamically based on the transcript
-        const dynamicData = generateDynamicAnalysis(transcriptText);
+        // Generate the rest of the analysis dynamically based on the diarized transcript
+        const dynamicData = generateDynamicAnalysis(diarizationResult.utterances);
         setAnalysisData(dynamicData);
         setAppState("results");
       };
@@ -130,7 +121,7 @@ export default function Home() {
       toast({
         variant: "destructive",
         title: "Analysis Failed",
-        description: "Something went wrong during the analysis. Please try again.",
+        description: "Something went wrong during the analysis. The AI model may be unable to process this audio. Please try again.",
       });
       setAppState("idle");
     }
