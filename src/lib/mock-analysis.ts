@@ -22,9 +22,9 @@ export const mockAnalysisData: AnalysisData = {
     { id: 7, speaker: 'A', label: 'Speaker A (Black Shirt)', text: "Exactly. It's a calculated risk, not a blind jump. I can draft a proposal for what that pilot could look like.", sentiment: 'Positive', emotion: 'proactive', timestamp: '00:48' },
   ],
   participation: [
-    { speaker: 'A', label: 'Speaker A (Black Shirt)', speakingTime: '12 min', supportive: 65, conflict: 20, neutral: 15, sentiment: 'Positive' },
-    { speaker: 'B', label: 'Speaker B (Red Shirt)', speakingTime: '9 min', supportive: 10, conflict: 70, neutral: 20, sentiment: 'Negative' },
-    { speaker: 'C', label: 'Speaker C (White Shirt)', speakingTime: '7 min', supportive: 55, conflict: 10, neutral: 35, sentiment: 'Neutral' },
+    { speaker: 'A', label: 'Speaker A (Black Shirt)', speakingTime: '21 sec', supportive: 65, conflict: 20, neutral: 15, sentiment: 'Positive' },
+    { speaker: 'B', label: 'Speaker B (Red Shirt)', speakingTime: '16 sec', supportive: 10, conflict: 70, neutral: 20, sentiment: 'Negative' },
+    { speaker: 'C', label: 'Speaker C (White Shirt)', speakingTime: '11 sec', supportive: 55, conflict: 10, neutral: 35, sentiment: 'Neutral' },
   ],
   emotionTimeline: [
     { time: '0:00', A: 0, B: 0, C: 0 },
