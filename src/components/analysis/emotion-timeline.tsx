@@ -18,9 +18,12 @@ interface EmotionTimelineProps {
   speakers: ParticipationMetric[];
 }
 
-const speakerChartColors = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
+const speakerChartColors = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-4))", "hsl(var(--chart-5))", "hsl(var(--chart-3))", "#a855f7", "#f43f5e", "#f97316"];
 
 export default function EmotionTimeline({ data, speakers }: EmotionTimelineProps) {
+  // Only show speakers who actually spoke
+  const activeSpeakers = speakers.filter(s => parseInt(s.speakingTime) > 0);
+
   return (
     <Card className="shadow-md">
       <CardHeader>
@@ -49,9 +52,9 @@ export default function EmotionTimeline({ data, speakers }: EmotionTimelineProps
               }}
               labelStyle={{ color: "hsl(var(--foreground))" }}
             />
-            <Legend wrapperStyle={{ fontSize: "12px" }} />
+            <Legend wrapperStyle={{ fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} />
             <line y1="0" y2="0" stroke="hsl(var(--border))" strokeDasharray="5 5" />
-            {speakers.map((speaker, index) => (
+            {activeSpeakers.map((speaker, index) => (
               <Line
                 key={speaker.speaker}
                 type="monotone"

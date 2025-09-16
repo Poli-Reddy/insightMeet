@@ -32,7 +32,7 @@ export default function ParticipationMetrics({ metrics }: ParticipationMetricsPr
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[150px]">Speaker</TableHead>
+              <TableHead className="w-[200px]">Participant</TableHead>
               <TableHead>Time</TableHead>
               <TableHead>Sentiment</TableHead>
               <TableHead className="text-right">Conflict %</TableHead>

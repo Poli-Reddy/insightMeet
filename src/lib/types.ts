@@ -12,9 +12,7 @@ export interface ParticipationMetric {
   speaker: string;
   label: string;
   speakingTime: string;
-  supportive: number;
   conflict: number;
-  neutral: number;
   sentiment: 'Positive' | 'Negative' | 'Neutral';
 }
 
