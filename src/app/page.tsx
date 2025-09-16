@@ -95,33 +95,31 @@ export default function Home() {
   const handleFileUpload = async (file: File) => {
     setAppState("loading");
     try {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = async () => {
-        const audioDataUri = reader.result as string;
-        
-        // Call the new diarization flow
-        const diarizationResult = await diarizeAudio({ audioDataUri });
-
-        if (!diarizationResult || !diarizationResult.utterances || diarizationResult.utterances.length === 0) {
-          throw new Error("Diarization failed or returned no utterances.");
-        }
-
-        // Generate the rest of the analysis dynamically based on the diarized transcript
-        const dynamicData = generateDynamicAnalysis(diarizationResult.utterances);
-        setAnalysisData(dynamicData);
-        setAppState("results");
-      };
-      reader.onerror = (error) => {
-        console.error("FileReader error: ", error);
-        throw new Error("Failed to read the file.");
+      // Upload the file to the API route
+      const formData = new FormData();
+      formData.append('file', file);
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!uploadRes.ok) {
+        const err = await uploadRes.json();
+        throw new Error(err.error || 'Upload failed');
       }
+      const { diarizationResult } = await uploadRes.json();
+      if (!diarizationResult || !diarizationResult.utterances || diarizationResult.utterances.length === 0) {
+        throw new Error("Diarization failed or returned no utterances.");
+      }
+      // Generate the rest of the analysis dynamically based on the diarized transcript
+      const dynamicData = generateDynamicAnalysis(diarizationResult.utterances);
+      setAnalysisData(dynamicData);
+      setAppState("results");
     } catch (error) {
       console.error("Analysis failed:", error);
       toast({
         variant: "destructive",
         title: "Analysis Failed",
-        description: "Something went wrong during the analysis. The AI model may be unable to process this audio. Please try again.",
+        description: error instanceof Error ? error.message : "Something went wrong during the analysis. The AI model may be unable to process this audio. Please try again.",
       });
       setAppState("idle");
     }
