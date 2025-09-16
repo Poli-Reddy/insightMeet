@@ -67,18 +67,23 @@ const pipelineSteps = [
     {
         title: "6) Face Detection & Tracking (appearance extraction)",
         content: `
-            **Purpose:** Detect faces per frame, track across frames, produce consistent face IDs and appearance descriptors (shirt color, glasses).<br/>
+            **Purpose:** Detect faces per frame, track across frames, and produce consistent face IDs and appearance descriptors (gender, clothing, accessories).<br/>
             **Input:** extracted frames.<br/>
-            **Output:** face tracks: [{face_id, frames: [(t, bbox)], embedding, appearance_tags}]<br/>
-            **Tech:** MediaPipe Face Detection for speed; ArcFace/InsightFace for embeddings; OpenCV for tracking; clothing color via bounding box below face or person detection model.<br/>
-            **Implementation notes:** Pipeline: detect faces per frame → compute embedding (ArcFace) → cluster embeddings to create \`face_id\`s → smooth tracks with tracking (SORT/Kalman) so one person across time = same face_id. For shirt color: detect person/upper-body bounding box using a person detector (YOLO), sample color patches, run k-means on RGB to get dominant color; map to name ("black", "red", "blue"). Accessory detection: small classifiers for glasses/beard using cropped face region.<br/>
-            **Pitfalls & mitigations:** Occlusion / face turned away: maintain short-term track-through using motion model; if embedding confidence is low, label as unknown and update when face returns.
+            **Output:** face tracks: [{face_id, frames: [(t, bbox)], embedding, appearance_tags: {gender, clothing_color, accessories}}].<br/>
+            **Tech:** MediaPipe Face Detection for speed; ArcFace/InsightFace for embeddings; OpenCV for tracking; CNN-based classifiers for attributes.<br/>
+            **Implementation notes:**<br/>
+            <ol class="list-decimal list-inside space-y-2">
+                <li><strong>Detection & Tracking:</strong> Detect faces per frame → compute embedding (ArcFace) → cluster embeddings to create \`face_id\`s → smooth tracks with a tracker (e.g., SORT) so one person across time is the same face_id.</li>
+                <li><strong>Attribute Classification (Gender, Accessories):</strong> For each tracked face, run a multi-label classification model (e.g., a fine-tuned ResNet or MobileNet) on the cropped face region to detect attributes like gender ('Man', 'Woman'), and accessories ('glasses', 'headset', 'beard').</li>
+                <li><strong>Clothing Color:</strong> Detect the person's upper-body bounding box (using a model like YOLO), sample color patches from that region, and run k-means on the RGB values to find the dominant color. This is then mapped to a color name ("black", "red", "blue").</li>
+            </ol>
+            **Pitfalls & mitigations:** Occlusion / face turned away: maintain short-term track-through using a motion model; if embedding confidence is low, label as unknown and update when the face returns. Attribute model accuracy can vary with lighting and pose.
         `
     },
     {
         title: "7) Active Speaker Mapping (voice ↔ face)",
         content: `
-            **Purpose:** Map diarization speaker labels to face IDs so transcripts say “A (black shirt)”.<br/>
+            **Purpose:** Map diarization speaker labels to face IDs so transcripts say “A (Man in black shirt)”.<br/>
             **Input:** diarization segments (time ranges) + face tracks (frame timestamps) + face mesh mouth activity.<br/>
             **Output:** mapping: speaker_label -> face_id and per-segment speaker attribution.<br/>
             **Tech:** lip-sync correlation (face mouth opening vs. audio energy), cross-modal alignment, time overlap heuristics.<br/>
@@ -86,7 +91,7 @@ const pipelineSteps = [
             <ol class="list-decimal list-inside space-y-2">
               <li>For each speech segment, find face tracks present in that time window.</li>
               <li>Compute lip-motion score for each face (difference of mouth landmarks across frames); compute audio energy for segment.</li>
-              <li>Correlate mouth-motion peaks with audio envelope — the face with highest correlation likely active-speaker.</li>
+              <li>Correlate mouth-motion peaks with audio envelope — the face with highest correlation is likely the active speaker.</li>
               <li>If no clear lip-sync (camera off/head down), fall back to voice embedding similarity: compute speaker voice embedding from diarization and compare to stored voiceprints from earlier segments.</li>
               <li>If multiple faces speak simultaneously, assign multiple face_ids (multi-speaker support).</li>
             </ol>
@@ -174,3 +179,5 @@ export default function PipelineBreakdown() {
     </Card>
   );
 }
+
+    
