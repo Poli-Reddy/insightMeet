@@ -14,8 +14,8 @@ type AppState = "idle" | "loading" | "results";
 
 // Helper to generate dynamic mock data based on a real transcript
 const generateDynamicAnalysis = (transcriptText: string): AnalysisData => {
-  const sentences = transcriptText.split('.').filter(s => s.trim().length > 0);
-  const numSpeakers = Math.min(6, sentences.length); // Limit speakers for this example
+  const sentences = transcriptText.split(/[.?!]/).filter(s => s.trim().length > 0);
+  const numSpeakers = Math.min(6, sentences.length);
   const speakers = Array.from({ length: numSpeakers }, (_, i) => ({
       id: String.fromCharCode(65 + i),
       label: `Speaker ${String.fromCharCode(65 + i)}`,
@@ -23,10 +23,21 @@ const generateDynamicAnalysis = (transcriptText: string): AnalysisData => {
   const speakerIds = speakers.map(s => s.id);
 
   let currentTime = 0;
+  let currentSpeakerIndex = 0;
+  let speakerTurnLength = 0;
+
   const transcript: TranscriptEntry[] = sentences.map((sentence, index) => {
-    const duration = Math.floor(sentence.length / 15) + 1; // Approx time
+    const duration = Math.floor(sentence.length / 15) + 1;
     currentTime += duration;
-    const speaker = speakers[index % numSpeakers];
+
+    // Simulate more realistic speaker turns
+    if (speakerTurnLength <= 0 || Math.random() < 0.3) {
+      currentSpeakerIndex = Math.floor(Math.random() * numSpeakers);
+      speakerTurnLength = Math.floor(Math.random() * 3) + 1; // Speak 1-3 sentences
+    }
+    speakerTurnLength--;
+    const speaker = speakers[currentSpeakerIndex];
+
     return {
       id: index + 1,
       speaker: speaker.id,
