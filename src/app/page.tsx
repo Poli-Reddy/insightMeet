@@ -7,6 +7,7 @@ import AnalysisDashboard from "@/components/analysis/analysis-dashboard";
 import { mockAnalysisData } from "@/lib/mock-analysis";
 import type { AnalysisData } from "@/lib/types";
 import Logo from "@/components/logo";
+import PipelineBreakdown from "@/components/pipeline-breakdown";
 
 type AppState = "idle" | "loading" | "results";
 
@@ -45,7 +46,12 @@ export default function Home() {
         </div>
       </header>
       <main className="flex-1 container py-8 md:py-12">
-        {appState === "idle" && <UploadForm onFileUpload={handleFileUpload} />}
+        {appState === "idle" && (
+          <div className="space-y-12">
+            <UploadForm onFileUpload={handleFileUpload} />
+            <PipelineBreakdown />
+          </div>
+        )}
         {appState === "loading" && (
           <div className="flex flex-col items-center justify-center h-full min-h-[60vh] text-center">
             <LoaderCircle className="w-12 h-12 animate-spin text-primary mb-4" />
