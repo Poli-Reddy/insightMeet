@@ -1,28 +1,128 @@
 "use client";
 
 import { useState } from "react";
-import { BrainCircuit, LoaderCircle } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import UploadForm from "@/components/analysis/upload-form";
 import AnalysisDashboard from "@/components/analysis/analysis-dashboard";
-import { mockAnalysisData } from "@/lib/mock-analysis";
-import type { AnalysisData } from "@/lib/types";
+import type { AnalysisData, TranscriptEntry, ParticipationMetric, EmotionTimelinePoint, RelationshipGraphData } from "@/lib/types";
 import Logo from "@/components/logo";
 import PipelineBreakdown from "@/components/pipeline-breakdown";
+import { transcribeAudio } from "@/ai/flows/automated-transcription";
+import { useToast } from "@/hooks/use-toast";
 
 type AppState = "idle" | "loading" | "results";
+
+// Helper to generate dynamic mock data based on a real transcript
+const generateDynamicAnalysis = (transcriptText: string): AnalysisData => {
+  const sentences = transcriptText.split('.').filter(s => s.trim().length > 0);
+  const numSpeakers = Math.min(6, sentences.length); // Limit speakers for this example
+  const speakers = Array.from({ length: numSpeakers }, (_, i) => ({
+      id: String.fromCharCode(65 + i),
+      label: `Speaker ${String.fromCharCode(65 + i)}`,
+  }));
+  const speakerIds = speakers.map(s => s.id);
+
+  let currentTime = 0;
+  const transcript: TranscriptEntry[] = sentences.map((sentence, index) => {
+    const duration = Math.floor(sentence.length / 15) + 1; // Approx time
+    currentTime += duration;
+    const speaker = speakers[index % numSpeakers];
+    return {
+      id: index + 1,
+      speaker: speaker.id,
+      label: speaker.label,
+      text: sentence.trim() + ".",
+      sentiment: ['Positive', 'Negative', 'Neutral'][Math.floor(Math.random() * 3)] as 'Positive' | 'Negative' | 'Neutral',
+      emotion: ['curious', 'supportive', 'critical'][Math.floor(Math.random() * 3)],
+      timestamp: `00:${currentTime.toString().padStart(2, '0')}`,
+    };
+  });
+
+  const participation: ParticipationMetric[] = speakers.map(speaker => {
+    const utterances = transcript.filter(t => t.speaker === speaker.id);
+    const speakingTime = utterances.reduce((acc, u) => acc + Math.floor(u.text.length / 15) + 1, 0);
+    return {
+      speaker: speaker.id,
+      label: speaker.label,
+      speakingTime: `${speakingTime} sec`,
+      conflict: Math.floor(Math.random() * 20),
+      sentiment: ['Positive', 'Negative', 'Neutral'][Math.floor(Math.random() * 3)] as 'Positive' | 'Negative' | 'Neutral',
+    };
+  });
+  
+  const emotionTimeline: EmotionTimelinePoint[] = Array.from({length: 5}, (_, i) => {
+      const time = Math.floor(i * (currentTime / 4));
+      const point: EmotionTimelinePoint = { time: `0:${time.toString().padStart(2, '0')}` };
+      speakerIds.forEach(id => {
+          point[id] = Math.random() * 2 - 1;
+      });
+      return point;
+  });
+
+  const relationshipGraph: RelationshipGraphData = {
+    nodes: speakers.map((s, i) => ({ id: s.id, label: s.label, group: i + 1 })),
+    links: Array.from({length: numSpeakers}, (_, i) => ({
+      source: speakers[i].id,
+      target: speakers[(i + 1) % numSpeakers].id,
+      type: ['support', 'conflict', 'neutral'][Math.floor(Math.random() * 3)] as 'support' | 'conflict' | 'neutral',
+      value: Math.floor(Math.random() * 3) + 1,
+    })),
+  };
+
+  return {
+    summary: {
+      title: "Dynamic Analysis Report",
+      overallSentiment: "Mixed",
+      points: transcript.slice(0, 4).map(t => t.text),
+      relationshipSummary: "This is a dynamically generated relationship summary based on the transcribed text."
+    },
+    transcript,
+    participation,
+    emotionTimeline,
+    relationshipGraph,
+  };
+}
+
 
 export default function Home() {
   const [appState, setAppState] = useState<AppState>("idle");
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
+  const { toast } = useToast();
 
-  const handleFileUpload = (file: File) => {
-    console.log("File uploaded:", file.name);
+  const handleFileUpload = async (file: File) => {
     setAppState("loading");
-    // Simulate AI processing delay
-    setTimeout(() => {
-      setAnalysisData(mockAnalysisData);
-      setAppState("results");
-    }, 3000);
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = async () => {
+        const audioDataUri = reader.result as string;
+        
+        // Call the transcription flow
+        const transcriptionResult = await transcribeAudio({ audioDataUri });
+        const transcriptText = transcriptionResult.transcript;
+
+        if (!transcriptText || transcriptText.trim().length === 0) {
+          throw new Error("Transcription failed or returned empty.");
+        }
+
+        // Generate the rest of the analysis dynamically based on the transcript
+        const dynamicData = generateDynamicAnalysis(transcriptText);
+        setAnalysisData(dynamicData);
+        setAppState("results");
+      };
+      reader.onerror = (error) => {
+        console.error("FileReader error: ", error);
+        throw new Error("Failed to read the file.");
+      }
+    } catch (error) {
+      console.error("Analysis failed:", error);
+      toast({
+        variant: "destructive",
+        title: "Analysis Failed",
+        description: "Something went wrong during the analysis. Please try again.",
+      });
+      setAppState("idle");
+    }
   };
 
   const handleNewAnalysis = () => {
