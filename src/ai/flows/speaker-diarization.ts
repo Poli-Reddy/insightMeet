@@ -61,20 +61,7 @@ const diarizeAudioFlow = ai.defineFlow(
   async (input) => {
     // In a real-world scenario, you might use a specific model for diarization.
     // For this example, we'll use a powerful general model capable of this task.
-    const {output} = await ai.generate({
-      model: 'googleai/gemini-2.5-flash',
-      prompt: diarizeAudioPrompt.prompt,
-      input: input,
-      output: {
-        schema: DiarizeAudioOutputSchema,
-      },
-      config: {
-        // Higher temperature can help in distinguishing nuanced speaker changes,
-        // but can also lead to more errors. This is a tunable parameter.
-        temperature: 0.3,
-      }
-    });
-
+    const {output} = await diarizeAudioPrompt(input);
     return output!;
   }
 );
